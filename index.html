@@ -1850,7 +1850,7 @@ body {
     /* Quick Control Pills: centered below skyTitle on mobile so they never overlap the title or moon */
     .orbit-quick-bar {
       position: fixed;
-      top: 104px;
+      top: var(--quickbar-top, calc(env(safe-area-inset-top, 0px) + 98px));
       left: 50%;
       transform: translateX(-50%);
       z-index: 35;
@@ -1864,7 +1864,7 @@ body {
     }
     @media (min-width: 768px) {
       .orbit-quick-bar {
-        top: 16px;
+        top: calc(env(safe-area-inset-top, 0px) + 16px);
         left: auto;
         right: 18px;
         transform: none;
@@ -1872,7 +1872,6 @@ body {
     }
     @media (max-width: 390px) {
       .orbit-quick-bar {
-        top: 98px;
         gap: 5px;
       }
       .orbit-pill-btn {
@@ -2197,7 +2196,7 @@ body {
     /* Mobile Quick Bar: sleek single-row layout below skyTitle */
     @media (max-width: 767px) {
       .orbit-quick-bar {
-        top: 96px !important;
+        top: var(--quickbar-top) !important;
         gap: 4px !important;
         flex-wrap: nowrap !important;
         max-width: 98vw !important;
@@ -2216,7 +2215,7 @@ body {
     }
     @media (max-width: 375px) {
       .orbit-quick-bar {
-        top: 90px !important;
+        top: var(--quickbar-top) !important;
         gap: 3px !important;
       }
       .orbit-pill-btn {
@@ -2254,9 +2253,9 @@ body {
       --safe-bottom: env(safe-area-inset-bottom, 0px);
       --safe-left: env(safe-area-inset-left, 0px);
       --safe-right: env(safe-area-inset-right, 0px);
-      --quickbar-top: calc(var(--safe-top) + 92px);
-      --whisper-top: calc(var(--safe-top) + 128px);
-      --toast-top: calc(var(--safe-top) + 162px);
+      --quickbar-top: calc(var(--safe-top) + 98px);
+      --whisper-top: calc(var(--safe-top) + 138px);
+      --toast-top: calc(var(--safe-top) + 176px);
       --royal-gold: #fde68a;
       --royal-rose: #f43f5e;
       --royal-pink: #f9a8d4;
@@ -2270,22 +2269,33 @@ body {
       padding-right: max(12px, var(--safe-right)) !important;
       z-index: 28 !important;
     }
-    @media (max-width: 420px) {
+    @media (max-width: 480px) {
       #skyTitle h1.glow-title {
-        font-size: clamp(21px, 5.6vw, 27px) !important;
-        line-height: 1.14 !important;
+        font-size: clamp(18px, 5.2vw, 22.5px) !important;
+        line-height: 1.15 !important;
+        margin: 0 !important;
       }
       #skyTitle p.glow-subtitle {
-        font-size: clamp(15.5px, 4.3vw, 20px) !important;
+        font-size: clamp(12.5px, 3.5vw, 14.5px) !important;
+        line-height: 1.2 !important;
         margin-top: 1px !important;
+      }
+      .pm-orn {
+        margin: 3px auto 0 !important;
+        width: min(200px, 62vw) !important;
+        height: 10px !important;
       }
     }
     @media (max-width: 360px) {
       #skyTitle h1.glow-title {
-        font-size: 19.5px !important;
+        font-size: 17.5px !important;
       }
       #skyTitle p.glow-subtitle {
-        font-size: 14.5px !important;
+        font-size: 12px !important;
+      }
+      .pm-orn {
+        margin: 2px auto 0 !important;
+        width: 170px !important;
       }
     }
 
@@ -2370,8 +2380,11 @@ body {
       transform: translateX(-50%) translateY(-6px);
     }
     @media (min-width: 768px) {
+      :root {
+        --whisper-top: calc(var(--safe-top) + 142px);
+      }
       .whisper-spectrum-hud {
-        top: calc(var(--safe-top) + 102px);
+        top: var(--whisper-top) !important;
       }
     }
     .whisper-pill-inner {
@@ -6736,6 +6749,10 @@ body {
       sequenceTimers.push(setTimeout(() => {
         skyTitle.classList.remove('opacity-0', 'translate-y-3');
         skyTitle.classList.add('opacity-100', 'translate-y-0');
+        if (typeof window.syncDynamicMobileLayout === 'function') {
+          setTimeout(window.syncDynamicMobileLayout, 60);
+          setTimeout(window.syncDynamicMobileLayout, 320);
+        }
       }, 280));
 
       sequenceTimers.push(setTimeout(() => {
@@ -6784,6 +6801,8 @@ body {
       }
       if (typeof window.syncDynamicMobileLayout === 'function') {
         window.syncDynamicMobileLayout();
+        setTimeout(window.syncDynamicMobileLayout, 150);
+        setTimeout(window.syncDynamicMobileLayout, 500);
       }
     }
 
@@ -10021,6 +10040,9 @@ var __EMBEDDED_ALBUM_IMAGES = {"10-ban4.jpg": "data:image/jpeg;base64,/9j/4AAQSk
       orn.setAttribute('aria-hidden', 'true');
       orn.innerHTML = '<i></i><span>✦</span><i></i>';
       tag.parentNode.insertBefore(orn, tag.nextSibling);
+      if (typeof window.syncDynamicMobileLayout === 'function') {
+        window.syncDynamicMobileLayout();
+      }
     }
   }
 
@@ -10277,40 +10299,51 @@ var __EMBEDDED_ALBUM_IMAGES = {"10-ban4.jpg": "data:image/jpeg;base64,/9j/4AAQSk
       var dockEl     = document.getElementById('floatingDock');
       var envEl      = document.getElementById('envelopeCard');
 
-      // 1. Measure Sky Title Bottom on Mobile so #orbitQuickBar never overlaps title text
-      var titleBottom = isMob ? 88 : 96;
+      // 1. Measure Sky Title Bottom with utmost safety & robust element boundaries
+      var titleBottom = isMob ? 84 : 126;
       if (skyTitleEl) {
         var tr = skyTitleEl.getBoundingClientRect();
         if (tr.height > 20) {
-          titleBottom = Math.max(76, Math.round(tr.bottom));
+          titleBottom = Math.max(titleBottom, Math.round(tr.bottom));
+        }
+        var ornEl = skyTitleEl.querySelector('.pm-orn');
+        var pEl   = skyTitleEl.querySelector('p');
+        if (ornEl) {
+          var or = ornEl.getBoundingClientRect();
+          if (or.bottom > titleBottom) titleBottom = Math.round(or.bottom);
+        } else if (pEl) {
+          var pr = pEl.getBoundingClientRect();
+          if (pr.bottom > titleBottom) titleBottom = Math.round(pr.bottom);
         }
       }
 
-      var quickBarTop = isMob ? (titleBottom + 5) : 16;
+      // 2. Compute Quick Bar Top & Bottom
+      var quickBarTop = isMob ? (titleBottom + 6) : 16;
       document.documentElement.style.setProperty('--quickbar-top', quickBarTop + 'px');
 
-      var quickBarBottom = quickBarTop + (isMob ? 30 : 34);
+      var quickBarBottom = quickBarTop + (isMob ? 28 : 34);
       if (quickBarEl && isMob) {
         var qr = quickBarEl.getBoundingClientRect();
         if (qr.height > 10) {
-          quickBarBottom = Math.round(quickBarTop + qr.height);
+          quickBarBottom = Math.max(quickBarBottom, Math.round(quickBarTop + qr.height));
         }
       }
 
-      // 2. Position Live Whisper & Spectrum HUD cleanly below QuickBar on mobile, or below SkyTitle on desktop
-      var whisperTop = isMob ? (quickBarBottom + 5) : (titleBottom + 6);
+      // 3. Position Live Whisper & Spectrum HUD cleanly below QuickBar on mobile, or below SkyTitle on desktop
+      var whisperTop = isMob ? (quickBarBottom + 6) : (titleBottom + 12);
+      whisperTop = Math.max(isMob ? 134 : 140, whisperTop);
       document.documentElement.style.setProperty('--whisper-top', whisperTop + 'px');
 
       var whisperVisible = whisperEl && !whisperEl.classList.contains('whisper-hud-off');
-      var topUiBottom = whisperVisible ? (whisperTop + 28) : quickBarBottom;
+      var topUiBottom = whisperVisible ? (whisperTop + 28) : (isMob ? quickBarBottom : (titleBottom + 4));
 
-      // Toast sits right below the top UI stack so it NEVER covers bottom controls!
-      document.documentElement.style.setProperty('--toast-top', (topUiBottom + 6) + 'px');
+      // 4. Toast sits right below the top UI stack so it NEVER covers bottom controls!
+      document.documentElement.style.setProperty('--toast-top', (topUiBottom + 8) + 'px');
 
-      // 3. Calculate Orbit Top Safe Limit so 3D Polaroid cards never collide with top pills
-      window.__dynamicOrbitTopSafe = topUiBottom + (isMob ? 8 : 10);
+      // 5. Calculate Orbit Top Safe Limit so 3D Polaroid cards never collide with top pills
+      window.__dynamicOrbitTopSafe = topUiBottom + (isMob ? 10 : 14);
 
-      // 4. Measure Bottom Stack (#floatingDock + #orbitNavHud) so #envelopeCard never overlaps #orbitNavHud
+      // 6. Measure Bottom Stack (#floatingDock + #orbitNavHud) so #envelopeCard never overlaps #orbitNavHud
       var dockH = 54;
       if (dockEl) {
         var dr = dockEl.getBoundingClientRect();
@@ -10342,6 +10375,19 @@ var __EMBEDDED_ALBUM_IMAGES = {"10-ban4.jpg": "data:image/jpeg;base64,/9j/4AAQSk
     window.addEventListener('orientationchange', function () {
       setTimeout(syncDynamicMobileLayout, 120);
     }, { passive: true });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        syncDynamicMobileLayout();
+      });
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+      var _skyTitle = document.getElementById('skyTitle');
+      if (_skyTitle) {
+        new ResizeObserver(function () {
+          syncDynamicMobileLayout();
+        }).observe(_skyTitle);
+      }
+    }
 
     /*************************************************************************
      * MODULE 3: ROYAL ASTROLABE BOUQUET HALO & SKY CONSTELLATION WEAVER
