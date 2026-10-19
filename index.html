@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Chúc Mừng 20/10 Mai Thy – Cô Gái Đặc Biệt Của 12A1 💐✨</title>
   <meta name="theme-color" content="#1b1030" />
   <meta name="description" content="Mot mon qua tuong tac nho xinh: giu de mo, cham phong bi, doc la thu." />
@@ -750,6 +750,27 @@ body {
       background-color: #030613;
       font-family: 'Quicksand', 'Inter', system-ui, -apple-system, sans-serif;
       color: #ffffff;
+      touch-action: manipulation;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      overscroll-behavior: none;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* Triệt tiêu double-tap zoom & pinch-zoom trên toàn bộ bề mặt canvas và sân khấu tương tác */
+    canvas, #sceneCanvas, #canvas, #fxCanvas, #fxLayer, #fxcv, #holdStage, #bouquetOrbitStage,
+    .bouquet-polaroid, .orbit-quick-bar, .orbit-nav-hud,
+    .floating-dock-wrap, .whisper-spectrum-hud, #skyTitle,
+    .envelope-card {
+      touch-action: none !important;
+    }
+
+    /* Giữ trải nghiệm cuộn mượt mà riêng trong các khung văn bản dài (bức thư, popup) */
+    .modal-body-scroll, .letter-modal-scroll, [data-allow-scroll], .vintage-letter-paper, #letterModalBody {
+      touch-action: pan-y !important;
+      -webkit-overflow-scrolling: touch !important;
+      overscroll-behavior-y: contain !important;
     }
 
     .font-cursive {
@@ -3687,6 +3708,67 @@ body {
   </div>
 
   <script>
+    /* =========================================================================
+     * MOBILE ANTI-ZOOM & RAPID-TAP STABILITY SHIELD
+     * - Chặn cử chỉ pinch-to-zoom (2 ngón) & double-tap zoom trên iOS Safari & Android
+     * - Ngăn ngừa tràn bộ nhớ GPU (Out-Of-Memory Jetsam Crash) khi chạm liên tục
+     * - Vẫn giữ phản hồi click tức thì cho các nút điều khiển và hiệu ứng cánh hoa
+     * ========================================================================= */
+    (function () {
+      if (typeof window === 'undefined') return;
+
+      // 1. Chặn cử chỉ zoom 2 ngón tay trên iOS WebKit
+      ['gesturestart', 'gesturechange', 'gestureend'].forEach(function (evt) {
+        document.addEventListener(evt, function (e) {
+          e.preventDefault();
+        }, { passive: false });
+      });
+
+      // 2. Chặn multi-touch pinch zoom
+      document.addEventListener('touchstart', function (e) {
+        if (e.touches && e.touches.length > 1) {
+          if (!e.target.closest('.modal-body-scroll, input, textarea, [data-allow-zoom]')) {
+            e.preventDefault();
+          }
+        }
+      }, { passive: false });
+
+      // 3. Chặn double-tap zoom nhưng vẫn dispatch click mượt mà không delay
+      var __lastTouchEnd = 0;
+      document.addEventListener('touchend', function (e) {
+        var now = performance.now();
+        if (now - __lastTouchEnd <= 300) {
+          if (!e.target.closest('input, textarea, [contenteditable="true"]')) {
+            e.preventDefault();
+            var btn = e.target.closest('button, a, [role="button"], .dock-btn, .orbit-pill-btn, .orbit-nav-btn, .envelope-card, .whisper-pill-inner, .whisper-quick-lantern, [data-album-step], [data-album-close]');
+            if (btn) {
+              btn.click();
+            } else {
+              var cv = document.getElementById('canvas');
+              if (cv && (e.target === cv || e.target.closest('#sceneCanvas, #canvas'))) {
+                var touch = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0] : null;
+                if (touch) {
+                  cv.dispatchEvent(new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window,
+                    clientX: touch.clientX,
+                    clientY: touch.clientY
+                  }));
+                }
+              }
+            }
+          }
+        }
+        __lastTouchEnd = now;
+      }, { passive: false });
+
+      // 4. Chặn dblclick zoom
+      document.addEventListener('dblclick', function (e) {
+        e.preventDefault();
+      }, { passive: false });
+    })();
+
     /*************************************************************************
      * 1. CONTENT DATA FOR MAI THY – 12A1
      *************************************************************************/
@@ -4800,14 +4882,14 @@ body {
 
     function syncCanvasSize(forceRebuild) {
       const rect = canvas.getBoundingClientRect();
-      const cw = Math.max(1, Math.round(rect.width || document.documentElement.clientWidth || window.innerWidth || 375));
-      const ch = Math.max(1, Math.round(rect.height || document.documentElement.clientHeight || window.innerHeight || 667));
-      // 1.5x: nền gradient/đồi mềm, không cần 2x. Đo thật: 390x844 @dpr2, main canvas
-      // chiếm 21% chi phí render của trang; hạ 2 -> 1.5 giảm ~44% pixel phải vẽ.
-      // Native Retina 2.75x DPR for ultra-crisp 4K flower petals & fine botanical details
-      const dpr = Math.min(window.devicePixelRatio || 2, 2.75);
-      const targetW = Math.round(cw * dpr);
-      const targetH = Math.round(ch * dpr);
+      const screenMaxDim = Math.max(window.screen.width || 390, window.screen.height || 844);
+      const cw = Math.min(screenMaxDim, Math.max(1, Math.round(rect.width || document.documentElement.clientWidth || window.innerWidth || 375)));
+      const ch = Math.min(screenMaxDim, Math.max(1, Math.round(rect.height || document.documentElement.clientHeight || window.innerHeight || 667)));
+      // Native Retina DPR with dynamic mobile clamp to prevent GPU OOM crashes
+      const isMob = cw < 768;
+      const dpr = Math.min(window.devicePixelRatio || 2, isMob ? 2.0 : 2.5);
+      const targetW = Math.min(2560, Math.round(cw * dpr));
+      const targetH = Math.min(2560, Math.round(ch * dpr));
 
       if (forceRebuild || Math.abs(cw - W) > 1 || Math.abs(ch - H) > 1 || canvas.width !== targetW || canvas.height !== targetH) {
         W = cw;
@@ -7127,11 +7209,13 @@ body {
 
       let FW = 0, FH = 0;
       function resizeFX() {
-        const dpr = Math.min(2.5, window.devicePixelRatio || 2);
-        FW = window.innerWidth;
-        FH = window.innerHeight;
-        fxcv.width = Math.round(FW * dpr);
-        fxcv.height = Math.round(FH * dpr);
+        const screenMaxDim = Math.max(window.screen.width || 390, window.screen.height || 844);
+        FW = Math.min(screenMaxDim, window.innerWidth || 390);
+        FH = Math.min(screenMaxDim, window.innerHeight || 844);
+        const isMob = FW < 768;
+        const dpr = Math.min(isMob ? 2.0 : 2.5, window.devicePixelRatio || 2);
+        fxcv.width = Math.min(2560, Math.round(FW * dpr));
+        fxcv.height = Math.min(2560, Math.round(FH * dpr));
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       resizeFX();
@@ -7766,14 +7850,15 @@ body {
   function safeResize(m) { try { m.resize && m.resize(env); } catch (e) { console.warn('[fx] resize', m.name, e); } }
 
   function resize() {
-    var w = window.innerWidth, h = window.innerHeight;
-    // Lớp glow mềm: 1x là đủ nét. Đo thật (390x844 @dpr2, headless): hạ 1.75 -> 1.0
-    // giảm 54% tổng chi phí raster của cả trang (fx canvas là 62% chi phí render).
-    var dpr = Math.min(window.devicePixelRatio || 2, 2.5);
+    var screenMaxDim = Math.max(window.screen.width || 390, window.screen.height || 844);
+    var w = Math.min(screenMaxDim, window.innerWidth || 390);
+    var h = Math.min(screenMaxDim, window.innerHeight || 844);
+    var isMob = w < 768;
+    var dpr = Math.min(window.devicePixelRatio || 2, isMob ? 1.75 : 2.2);
     env.w = w; env.h = h; env.dpr = dpr;
     if (!canvas) return;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    canvas.width = Math.min(2560, Math.round(w * dpr));
+    canvas.height = Math.min(2560, Math.round(h * dpr));
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
